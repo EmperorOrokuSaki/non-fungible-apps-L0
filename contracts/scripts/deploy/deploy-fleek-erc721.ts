@@ -21,7 +21,7 @@ export default async (
     {
       name: 'FleekERC721',
       newProxyInstance,
-      args: [name, symbol, billing],
+      args: [name, symbol, billing, "0xbfD2135BFfbb0B5378b56643c2Df8a87552Bfa23"],
       libraries,
     },
     hre

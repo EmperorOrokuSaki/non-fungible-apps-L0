@@ -12,6 +12,7 @@ import "./FleekAccessPoints.sol";
 import "./util/FleekENS.sol";
 import "./util/FleekStrings.sol";
 import "./IERCX.sol";
+import "./util/NonBlockingLzApp.sol";
 
 error MustBeTokenOwner(uint256 tokenId);
 error MustBeTokenVerifier(uint256 tokenId);
@@ -19,6 +20,7 @@ error ThereIsNoTokenMinted();
 error TransferIsDisabled();
 
 contract FleekERC721 is
+    NonblockingLzApp,
     IERCX,
     Initializable,
     ERC721Upgradeable,
@@ -56,6 +58,8 @@ contract FleekERC721 is
     mapping(uint256 => address) private _tokenVerifier;
     mapping(uint256 => bool) private _tokenVerified;
 
+    uint16 destChainId = 10109; // mumbai
+
     /**
      * @dev This constructor sets the state of implementation contract to paused
      * and disable initializers, not allowing interactions with the implementation
@@ -74,12 +78,14 @@ contract FleekERC721 is
     function initialize(
         string memory _name,
         string memory _symbol,
-        uint256[] memory initialBillings
+        uint256[] memory initialBillings,
+        address _lzEndpoint
     ) public initializer {
         __ERC721_init(_name, _symbol);
         __FleekAccessControl_init();
         __FleekBilling_init(initialBillings);
         __FleekPausable_init();
+        NonblockingLzApp.initializeNonblockingLzApp(_lzEndpoint);
     }
 
     /**
@@ -210,6 +216,26 @@ contract FleekERC721 is
         Token storage app = _apps[tokenId];
 
         return (app.name, app.ENS, app.logo, app.color.toColorString(), app.builds[app.currentBuild].ipfsHash);
+    }
+
+    function _nonblockingLzReceive(uint16, bytes memory, uint64, bytes memory _payload) internal override {
+        // Receives a tokenId from an app collection and sends metadata to the same collection
+        uint256 tokenId = abi.decode(_payload, (uint256));
+        _requireMinted(tokenId);
+        Token storage app = _apps[tokenId];
+
+        bytes memory payload = abi.encode(
+            app.name,
+            app.ENS,
+            app.logo,
+            app.color.toColorString(),
+            app.builds[app.currentBuild].ipfsHash
+        );
+        _lzSend(destChainId, payload, payable(msg.sender), address(0x0), bytes(""), msg.value);
+    }
+
+    function trustAddress(address _appContract) public requireCollectionRole(CollectionRoles.Owner) {
+        trustedRemoteLookup[destChainId] = abi.encodePacked(_appContract, address(this));
     }
 
     /**

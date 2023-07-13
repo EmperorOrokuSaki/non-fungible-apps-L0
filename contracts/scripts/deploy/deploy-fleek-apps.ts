@@ -23,7 +23,7 @@ export default async (
     {
       name: 'FleekApps',
       newProxyInstance,
-      args: [name, symbol, mainContract.address],
+      args: [name, symbol, mainContract.address, "0xf69186dfBa60DdB133E91E9A4B5673624293d8F8"],
       libraries,
     },
     hre
